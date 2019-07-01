@@ -29,7 +29,7 @@ GCSButton = None
 gcsfs = bfs = tfs = rfs = gpsfs = "Inactive"
 
 #connects to a drone sitting at ip:port and dispatches a thread to display it's
-#inforamtion to the readout window
+#information to the readout window
 def connectToDrone(dkip, dkport):
 
 
@@ -47,14 +47,14 @@ def connectToDrone(dkip, dkport):
   global THR_FS_VAL
   THR_FS_VAL = vehicle.parameters['THR_FS_VALUE']
   #Battery capacity failsafe value
-  global FS_BATT_MAH
-  FS_BATT_MAH = vehicle.parameters['FS_BATT_MAH']
+  global BATT_CRT_MAH
+  BATT_CRT_MAH = vehicle.parameters['BATT_CRT_MAH']
   #ID of the ground control station
   global SYSID_MYGCS
   SYSID_MYGCS = vehicle.parameters['SYSID_MYGCS']
 
   # create thread to update readout information in real time
-  thread.start_new_thread(updateVehicleStatus, (vehicle,))
+  _thread.start_new_thread(updateVehicleStatus, (vehicle,))
 
 #disconnects the vehicle and cleans the readout
 def disconnect():
@@ -72,7 +72,7 @@ def updateVehicleStatus(vehicle):
         updateText += ("System Status: %s" % vehicle.system_status.state +
         "\nLast Heartbeat: %s" %vehicle.last_heartbeat +
               "\nMode: %s" % vehicle.mode.name +
-              "\nIs Atmable?: %s" % vehicle.is_armable + "\n")
+              "\nIs Armable?: %s" % vehicle.is_armable + "\n")
         #Add battery/location/environment info
         updateText += ("\nBattery Capacity: %s MAH" % vehicle.parameters['BATT_CAPACITY'] +
                "\nGPS Info: %s" % vehicle.gps_0 +
@@ -254,18 +254,18 @@ def battery():
   #create param dictionary
   mav_param = mavparm.MAVParmDict()
   #get global dronekit vehicle, button, battert MAH,and failsafe readout text
-  global vehicle, battButton, FS_BATT_MAH, bfs
+  global vehicle, battButton, BATT_CRT_MAH, bfs
   #if button text says to activate battery failsafe
   if battButton.configure('text')[-1] == 'Activate Battery Failsafe':
     #set battery FS value above current capacity
-    vehicle.parameters['FS_BATT_MAH'] = float(4000)
+    vehicle.parameters['BATT_CRT_MAH'] = float(2)
     #set readout text
     bfs = "Active"
     #set button text
     battButton.configure(text="Deactivate Battery Failsafe")
   else:
     #set battery capacity back to normal
-    vehicle.parameters['FS_BATT_MAH'] = float(FS_BATT_MAH)
+    vehicle.parameters['BATT_CRT_MAH'] = float(BATT_CRT_MAH)
     #set readout
     bfs = "Inactive"
     #set button text
