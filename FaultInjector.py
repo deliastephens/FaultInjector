@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #from dronekit_sitl import SITL
 # Import DroneKit-Python
-from dronekit import connect, VehicleMode
+from dronekit import connect, VehicleMode, Command
 from tkinter import *
 import time, _thread, sys, struct, os
 from curses import ascii
@@ -27,12 +27,11 @@ GCSButton = None
 
 #Button Activity
 gcsfs = bfs = tfs = rfs = gpsfs = "Inactive"
+missionRead = "False"
 
 #connects to a drone sitting at ip:port and dispatches a thread to display it's
 #information to the readout window
 def connectToDrone(dkip, dkport):
-
-
   #Dronekit connection
   global vehicle
   #connect to vehicle at ip:port
@@ -60,12 +59,53 @@ def connectToDrone(dkip, dkport):
 def disconnect():
   #close vehicle connection
   vehicle.close()
-  updateReadoutWindow(updatePanes[0], "Disconneced")
+  updateReadoutWindow(updatePanes[0], "Disconnected")
   global connected
   connected = False
 
-#continually updates the readout with vehicle information
+def readMission(aFileName):
+    """
+    Load a mission from a file into a list. The mission definition is in the Waypoint file
+    format (http://qgroundcontrol.org/mavlink/waypoint_protocol#waypoint_file_format).
+
+    This function is used by upload_mission().
+    """
+    global vehicle
+    global missionlist
+    global missionRead
+
+    print("Reading a mission")
+    cmds = vehicle.commands
+    missionlist=[]
+    with open(aFileName) as f:
+        for i, line in enumerate(f):
+            if i==0:
+                if not line.startswith('QGC WPL 110'):
+                    raise Exception('File is not supported WP version')
+            else:
+                linearray=line.split('\t')
+                ln_index=int(linearray[0])
+                ln_currentwp=int(linearray[1])
+                ln_frame=int(linearray[2])
+                ln_command=int(linearray[3])
+                ln_param1=float(linearray[4])
+                ln_param2=float(linearray[5])
+                ln_param3=float(linearray[6])
+                ln_param4=float(linearray[7])
+                ln_param5=float(linearray[8])
+                ln_param6=float(linearray[9])
+                ln_param7=float(linearray[10])
+                ln_autocontinue=int(linearray[11].strip())
+                cmd = Command( 0, 0, 0, ln_frame, ln_command, ln_currentwp, ln_autocontinue, ln_param1, ln_param2, ln_param3, ln_param4, ln_param5, ln_param6, ln_param7)
+                missionlist.append(cmd)
+    missionRead = "True"
+    return missionlist
+
+
 def updateVehicleStatus(vehicle):
+    """
+    Updates readout with vehicle information while vehicle is connected.
+    """
     while connected:
     #update the readout with vehicle information
         updateText = ''
@@ -87,7 +127,8 @@ def updateVehicleStatus(vehicle):
         "\nRadio Failsafe:    " + rfs +
         "\nThrottle Failsafe: "  + tfs +
         "\nBattery Failsafe:  " + bfs +
-        "\nGCS Failsafe:      " + gcsfs)
+        "\nGCS Failsafe:      " + gcsfs +
+        "\nMission Read:      " + missionRead)
 
         #update the readout
         updateReadoutWindow(updatePanes[0], updateText)
@@ -95,6 +136,7 @@ def updateVehicleStatus(vehicle):
         root.update()
         #wait for 1 second
         time.sleep(1)
+
 
 #helper function to write information to the readout
 def updateReadoutWindow(textWindow, text):
@@ -109,44 +151,72 @@ def updateReadoutWindow(textWindow, text):
 
 #adds toolbar to root frame
 def loadToolbar(root):
-  #Creates toolbar frame
-  toolbar = Frame(root);
-  mpToolbar = Frame(toolbar);
-  sToolbar = Frame(toolbar);
+    """
+    Adds toolbars to the root frame. TKinter only; doesn't keep
+    any of the variables.
+    Includes: IP/Port connection, Mission Parser and Loader
+    """
+    #Creates toolbar frame
+    toolbar = Frame(root);
+    mpToolbar = Frame(toolbar);
+    #sToolbar = Frame(toolbar);
+    fileToolbar = Frame(toolbar)
 
-  mpLabel = Label(mpToolbar, text = "Connect to Drone: ")
-  mpLabel.pack(side=LEFT, padx=2, pady=2)
-  #creates IP label
-  MPipLabel = Label(mpToolbar, text="IP Address")
-  MPipLabel.pack(side=LEFT, padx=2, pady=2)
+    ###
+    # mpToolBar
+    ###
 
-  #creates IP entry box
-  MPipBox = Entry(mpToolbar)
-  MPipBox.delete(0, END)
-  MPipBox.insert(0, "127.0.0.1")
-  MPipBox.pack(side=LEFT, padx=2, pady=2)
+    mpLabel = Label(mpToolbar, text = "Connect to Drone: ")
+    mpLabel.pack(side=LEFT, padx=2, pady=2)
+    #creates IP label
+    MPipLabel = Label(mpToolbar, text="IP Address")
+    MPipLabel.pack(side=LEFT, padx=2, pady=2)
 
-  #creates port label
-  MPportLabel = Label(mpToolbar, text="Port")
-  MPportLabel.pack(side=LEFT, padx=2, pady=2)
+    #creates IP entry box
+    MPipBox = Entry(mpToolbar)
+    MPipBox.delete(0, END)
+    MPipBox.insert(0, "127.0.0.1")
+    MPipBox.pack(side=LEFT, padx=2, pady=2)
 
-  #creates port entry box
-  MPportBox = Entry(mpToolbar)
-  MPportBox.delete(0, END)
-  MPportBox.insert(0, "14551")
-  MPportBox.pack(side=LEFT, padx=2, pady=2)
+    #creates port label
+    MPportLabel = Label(mpToolbar, text="Port")
+    MPportLabel.pack(side=LEFT, padx=2, pady=2)
 
-  #creates connection button
-  MPcon = Button(mpToolbar, text="Connect", width=6, command=lambda: connectToDrone(MPipBox.get(), MPportBox.get()))
-  MPcon.pack(side=LEFT, padx=2, pady=2)
-  #creates disconnect button
-  MPdis = Button(mpToolbar, text="Disconnect", width=6, command=disconnect)
-  MPdis.pack(side=LEFT, padx=2, pady=2)
+    #creates port entry box
+    MPportBox = Entry(mpToolbar)
+    MPportBox.delete(0, END)
+    MPportBox.insert(0, "14551")
+    MPportBox.pack(side=LEFT, padx=2, pady=2)
 
-  #creates connection button
-  mpToolbar.pack(side=TOP, fill=X)
-  sToolbar.pack(side=TOP, fill=X)
-  toolbar.pack(side=TOP, fill=X)
+    #creates connection button
+    MPcon = Button(mpToolbar, text="Connect", width=6, command=lambda: connectToDrone(MPipBox.get(), MPportBox.get()))
+    MPcon.pack(side=LEFT, padx=2, pady=2)
+    #creates disconnect button
+    MPdis = Button(mpToolbar, text="Disconnect", width=8, command=disconnect)
+    MPdis.pack(side=LEFT, padx=2, pady=2)
+
+    ###
+    # fileToolbar
+    ###
+
+    fileLabel = Label(fileToolbar, text = "Load File: ")
+    fileLabel.pack(side=LEFT, padx=2, pady=2)
+    fileBox = Entry(fileToolbar)
+    fileBox.delete(0, END)
+    fileBox.insert(0, "mission_basic.txt")
+    fileBox.pack(side=LEFT, padx=2, pady=2)
+    fileLoad = Button(fileToolbar, text="Load", width=6, command=lambda: readMission(fileBox.get()))
+    fileLoad.pack(side=LEFT, padx=2, pady=2)
+
+
+    ###
+    # PACKING TOOLBARS
+    ####
+    #creates connection button
+    mpToolbar.pack(side=TOP, fill=X)
+    fileToolbar.pack(side=TOP, fill=X)
+    #sToolbar.pack(side=TOP, fill=X)
+    toolbar.pack(side=TOP, fill=X)
 
 #creates a split panned window, with a text box on the left, and fault buttons on the left
 def loadInfoPane(root):
@@ -227,7 +297,6 @@ def rc():
         rfs = "Inactive"
         #change button text
         rcButton.configure(text='Disable RC')
-
 
 def throttle():
     #create parameter dictionary

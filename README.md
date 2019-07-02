@@ -1,2 +1,3 @@
 # FaultInjector
-A dronekit fault injector for SITL
+A dronekit fault injector for SITL.
+
