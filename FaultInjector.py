@@ -189,7 +189,8 @@ def loadToolbar(root):
     fileBox.delete(0, END)
     fileBox.insert(0, "mission_basic.txt")
     fileBox.pack(side=LEFT, padx=2, pady=2)
-    fileLoad = Button(fileToolbar, text="Load", width=6, command=lambda: uploadMission(fileBox.get()))
+    mission_url = 'missions/' + fileBox.get()
+    fileLoad = Button(fileToolbar, text="Load", width=6, command=lambda: uploadMission(mission_url))
     fileLoad.pack(side=LEFT, padx=2, pady=2)
 
 

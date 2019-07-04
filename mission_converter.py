@@ -133,4 +133,4 @@ def processMission(fileName, vehicle):
     changedMissionList = makeCommands()
     return changedMissionList
 
-#print(processMission('mission_far.txt', 'fart'))
+#print(processMission('mission_basic.txt'))
