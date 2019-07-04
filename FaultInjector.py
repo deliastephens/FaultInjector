@@ -77,15 +77,13 @@ def uploadMission(aFileName):
     #Clear existing mission from vehicle
     print('Clearing mission')
     cmds = vehicle.commands
-    print(len(cmds))
     cmds.clear()
     #Add new mission to vehicle
     for command in missionlist:
         cmds.add(command)
-    print('Uploading mission')
-    print(len(cmds))
+    print('Uploading mission...')
     vehicle.commands.upload()
-    print('Mission uploaded')
+    print('Mission uploaded.')
 
 
 def updateVehicleStatus(vehicle):

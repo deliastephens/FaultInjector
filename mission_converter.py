@@ -1,8 +1,8 @@
 from dronekit import Command
 command_list = [] # List of commands from original WP file
-coord_list = [] # List of (lat, long) pairs from original WP file
 diffs = [] # List of (lat diff, long diff): differences between waypoints
 new_command_list = [] # Recentered list of commands
+wp_list = [] # List of all waypoints
 
 def readMission(aFileName):
     """
@@ -12,10 +12,11 @@ def readMission(aFileName):
     Returns a list of latitude, longitude pairs.
     """
     global command_list
-    global coord_list
+    global wp_list
+    command_list = []
+    wp_list = []
 
-
-    print("Reading a mission")
+    print("Reading mission...")
     # Opens the filename
     with open(aFileName) as f:
         for i, line in enumerate(f):
@@ -26,25 +27,33 @@ def readMission(aFileName):
             else:
                 # Grabs the latitude and longitude, appending to coordinate list
                 linearray=line.strip().split('\t')
+                print(linearray)
+                command_type = float(linearray[3])
+                if command_type == 16.0:
+                    wp_list.append(linearray)
                 ln_param5=float(linearray[8])
                 ln_param6=float(linearray[9])
                 command_list.append((linearray))
-                coord_list.append((ln_param5, ln_param6))
 
 def calcDiff():
     """
     Calculates the difference between waypoints. Right now only supports
     takeoff and waypoint commands.
     """
-    global coord_list
+    global wp_list
     global diffs
 
     # Goes through each coordinate in list of coordinates
     # Calculates the difference between each pair
     # Appends to an array
-    for i in range(len(coord_list) - 1):
-        lat_diff = coord_list[i + 1][0] - coord_list[i][0]
-        long_diff = coord_list[i + 1][1] - coord_list[i][1]
+    for i in range(len(wp_list) - 1):
+        next_lat = float(wp_list[i + 1][8])
+        lat = float(wp_list[i][8])
+        next_long = float(wp_list[i + 1][9])
+        long = float(wp_list[i][9])
+
+        lat_diff = next_lat - lat
+        long_diff = next_long - long
         diffs.append((lat_diff, long_diff))
 
 def createNewCoords(vehicle):
@@ -72,19 +81,23 @@ def createNewCoords(vehicle):
     # Adds the difference between coordinates to the previous latitude
     # and longitude by indexing into difference array
     for i in range(1, len(new_command_list)):
-        new_command_list[i][8] = diffs[i - 1][0] + prev_lat
-        new_command_list[i][9] = diffs[i - 1][1] + prev_long
-        prev_lat = float(new_command_list[i][8])
-        prev_long = float(new_command_list[i][9])
-        print(prev_lat, prev_long)
+        if float(new_command_list[i][3]) == 16:
+            lat_diff, long_diff = diffs.pop(0)
+            new_command_list[i][8] = lat_diff + prev_lat
+            new_command_list[i][9] = long_diff + prev_long
+            prev_lat = float(new_command_list[i][8])
+            prev_long = float(new_command_list[i][9])
+
+    print('New Command List:')
+    for command in new_command_list:
+        print(command)
 
 
 def makeCommands():
     # Makes commands out o f the new command list with modified coordinates
     # From the 3DR example code
     global new_command_list
-    print('making commands')
-    print(len(new_command_list))
+    print('Making new commands...')
     missionList = []
     for command in new_command_list:
         ln_index=int(command[0])
@@ -101,12 +114,11 @@ def makeCommands():
         ln_autocontinue=int(command[11])
         cmd = Command(0, 0, 0, ln_frame, ln_command, ln_currentwp, ln_autocontinue, ln_param1, ln_param2, ln_param3, ln_param4, ln_param5, ln_param6, ln_param7)
         missionList.append(cmd)
-    print('changed length ' + str(len(missionList)))
     return missionList
 
 def processMission(fileName, vehicle):
     """
-    Ties evreything together.
+    Ties everything together.
     First, reads the current mission, calculating difference between lats and longs
     With these differences, generates a list of new commands.
     Formats these commands appropriately.
