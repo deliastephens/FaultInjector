@@ -29,10 +29,9 @@ def readMission(aFileName):
                 linearray=line.strip().split('\t')
                 print(linearray)
                 command_type = float(linearray[3])
+                # If the command is a new waypoint, add it to the list to calculate
                 if command_type == 16.0:
                     wp_list.append(linearray)
-                ln_param5=float(linearray[8])
-                ln_param6=float(linearray[9])
                 command_list.append((linearray))
 
 def calcDiff():
@@ -47,6 +46,7 @@ def calcDiff():
     # Calculates the difference between each pair
     # Appends to an array
     for i in range(len(wp_list) - 1):
+        # Grab the latitudes and longitudes from the waypoint list
         next_lat = float(wp_list[i + 1][8])
         lat = float(wp_list[i][8])
         next_long = float(wp_list[i + 1][9])
