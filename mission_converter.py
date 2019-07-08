@@ -94,7 +94,7 @@ def createNewCoords(vehicle):
 
 
 def makeCommands():
-    # Makes commands out o f the new command list with modified coordinates
+    # Makes commands out of the new command list with modified coordinates
     # From the 3DR example code
     global new_command_list
     print('Making new commands...')

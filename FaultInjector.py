@@ -52,6 +52,8 @@ def connectToDrone(dkip, dkport):
   #ID of the ground control station
   global SYSID_MYGCS
   SYSID_MYGCS = vehicle.parameters['SYSID_MYGCS']
+  global HOME_LOC
+  HOME_LOC = vehicle.location.global_frame
 
   # create thread to update readout information in real time
   _thread.start_new_thread(updateVehicleStatus, (vehicle,))
@@ -64,6 +66,35 @@ def disconnect():
   global connected
   connected = False
 
+def startMission():
+    global vehicle
+    print("Basic pre-arm checks")
+    while not vehicle.is_armable:
+        print(" Waiting for vehicle to initialise...")
+        time.sleep(1)
+
+    # Arm vehicle if armable
+    vehicle.armed = True
+
+    while not vehicle.armed:
+        print(" Waiting for arming...")
+        time.sleep(1)
+
+    # Appears to set home position
+    vehicle.commands.next=0
+
+    vehicle.mode = VehicleMode('AUTO')
+
+
+def resetMission():
+    """
+    Returns vehicle to its home position
+    Sets the velocity to 0, disarms, and sets mode back to manual
+    Should probably also reset battery
+    """
+    global vehicle
+    print("Resetting Position...")
+    vehicle.reboot()
 
 def uploadMission(aFileName):
     """
@@ -189,9 +220,12 @@ def loadToolbar(root):
     fileBox.delete(0, END)
     fileBox.insert(0, "mission_basic.txt")
     fileBox.pack(side=LEFT, padx=2, pady=2)
-    mission_url = 'missions/' + fileBox.get()
-    fileLoad = Button(fileToolbar, text="Load", width=6, command=lambda: uploadMission(mission_url))
+    fileLoad = Button(fileToolbar, text="Load", width=6, command=lambda: uploadMission('missions/' + fileBox.get()))
     fileLoad.pack(side=LEFT, padx=2, pady=2)
+    fileLoad = Button(fileToolbar, text="Start", width=6, command=lambda: startMission())
+    fileLoad.pack(side=LEFT, padx=2, pady=2)
+    resetButton = Button(fileToolbar, text="Reset", width=6, command=lambda: resetMission())
+    resetButton.pack(side=LEFT, padx=2, pady=2)
 
 
     ###
