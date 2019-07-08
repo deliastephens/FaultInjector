@@ -58,7 +58,7 @@ def calcDiff():
 
 def createNewCoords(vehicle):
     """
-    Makes a list of new commands centered around the new home point
+    Makes a list of new commands centered around the new home point.
     """
     global diffs
     global command_list

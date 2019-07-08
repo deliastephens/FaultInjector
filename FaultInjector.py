@@ -67,6 +67,11 @@ def disconnect():
   connected = False
 
 def startMission():
+    """
+    Starts the loaded mission file.
+    Arms drone, resets home to loaded coords, and then sets mode
+    to AUTO to begin mission. 
+    """
     global vehicle
     print("Basic pre-arm checks")
     while not vehicle.is_armable:
@@ -83,6 +88,7 @@ def startMission():
     # Appears to set home position
     vehicle.commands.next=0
 
+    # Changes mode to auto to start mission
     vehicle.mode = VehicleMode('AUTO')
 
 
