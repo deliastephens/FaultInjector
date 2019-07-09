@@ -1,6 +1,9 @@
 #!/usr/bin/python
-#from dronekit_sitl import SITL
+from dronekit_sitl import SITL
 # Import DroneKit-Python
+import os
+import signal
+import psutil
 from dronekit import connect, VehicleMode, Command
 from tkinter import *
 import time, _thread, sys, struct, os
@@ -9,6 +12,7 @@ from pymavlink import mavparm, mavutil
 from pymavlink.dialects.v10 import common as mavlink
 from mission_converter import processMission
 
+import subprocess
 # globals
 #TK panes which need to be updated
 updatePanes = None
@@ -29,6 +33,47 @@ GCSButton = None
 #Button Activity
 gcsfs = bfs = tfs = rfs = gpsfs = "Inactive"
 missionRead = "False"
+
+"""
+Code to kill all MavProxy scripts. Borrowed from:
+http://makble.com/kill-process-with-python-on-windows
+"""
+def kill_by_process_name(name):
+    """
+    Goes through all processes and kills those with matching names
+    """
+    for proc in psutil.process_iter():
+        if proc.name() == name:
+            print("Killing process: " + name)
+            if not 'SYSTEM' in proc.name():
+                proc.kill()
+                print("Killing process: " + name + " success")
+    return
+
+    print("Not found process: " + name)
+
+def check_process_exist_by_name(name):
+    """
+    Checks to see if a process with a particular name exists
+    """
+    for proc in psutil.process_iter():
+        if proc.name() == name:
+            return True
+
+    return False
+
+def startSITL(lat=None, lon=None):
+    global sitl
+    os.chdir(r"C:\cygwin64\bin")
+    cmd = ["bash.exe", "-c", '. /etc/profile;  sim_vehicle.py --console --out 192.168.5.32:14550 -L MEX -v ArduPlane']
+
+    sitl = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                       shell=True)
+
+def stopSITL():
+    for proc in psutil.process_iter():
+        print(proc.name())
+    kill_by_process_name('mavproxy.exe')
 
 #connects to a drone sitting at ip:port and dispatches a thread to display it's
 #information to the readout window
@@ -70,7 +115,7 @@ def startMission():
     """
     Starts the loaded mission file.
     Arms drone, resets home to loaded coords, and then sets mode
-    to AUTO to begin mission. 
+    to AUTO to begin mission.
     """
     global vehicle
     print("Basic pre-arm checks")
@@ -90,7 +135,6 @@ def startMission():
 
     # Changes mode to auto to start mission
     vehicle.mode = VehicleMode('AUTO')
-
 
 def resetMission():
     """
@@ -121,7 +165,6 @@ def uploadMission(aFileName):
     print('Uploading mission...')
     vehicle.commands.upload()
     print('Mission uploaded.')
-
 
 def updateVehicleStatus(vehicle):
     """
@@ -158,7 +201,6 @@ def updateVehicleStatus(vehicle):
         #wait for 1 second
         time.sleep(1)
 
-
 #helper function to write information to the readout
 def updateReadoutWindow(textWindow, text):
   #sets the readout window from read only to read/write
@@ -186,6 +228,11 @@ def loadToolbar(root):
     ###
     # mpToolBar
     ###
+
+    SITLStartcon = Button(mpToolbar, text="Start SITL", width=6, command=lambda: startSITL())
+    SITLStartcon.pack(side=LEFT, padx=2, pady=2)
+    SITLStopcon = Button(mpToolbar, text="Stop SITL", width=6, command=lambda: stopSITL())
+    SITLStopcon.pack(side=LEFT, padx=2, pady=2)
 
     mpLabel = Label(mpToolbar, text = "Connect to Drone: ")
     mpLabel.pack(side=LEFT, padx=2, pady=2)
