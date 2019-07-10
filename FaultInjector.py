@@ -30,6 +30,8 @@ battButton = None
 thrButton = None
 GCSButton = None
 
+mission_name = "None"
+
 #Button Activity
 gcsfs = bfs = tfs = rfs = gpsfs = "Inactive"
 missionRead = "False"
@@ -80,12 +82,13 @@ def stopSITL():
 def connectToDrone(dkip, dkport):
   #Dronekit connection
   global vehicle
+  global previous_ip
+  global previous_port
+  previous_ip = dkip
+  previous_port = dkport
   #connect to vehicle at ip:port
   print("Attempting To Connect to Dronekit")
   vehicle = connect(dkip+':'+dkport, wait_ready=True)
-  #set connected bool to True
-  global connected
-  connected = True
 
   #initialize globals associated with the vehicle
   #Throttle PWM fail safe value
@@ -100,8 +103,13 @@ def connectToDrone(dkip, dkport):
   global HOME_LOC
   HOME_LOC = vehicle.location.global_frame
 
+  #set connected bool to True
+  global connected
+  connected = True
+
   # create thread to update readout information in real time
   _thread.start_new_thread(updateVehicleStatus, (vehicle,))
+
 
 #disconnects the vehicle and cleans the readout
 def disconnect():
@@ -143,8 +151,14 @@ def resetMission():
     Should probably also reset battery
     """
     global vehicle
+    global previous_ip
+    global previous_port
     print("Resetting Position...")
-    vehicle.reboot()
+    disconnect()
+    stopSITL()
+    startSITL()
+    connectToDrone(previous_ip, previous_port)
+
 
 def uploadMission(aFileName):
     """
@@ -152,6 +166,10 @@ def uploadMission(aFileName):
     """
     #Read mission from file
     global vehicle
+    global mission_name
+    start = aFileName.find('/')
+    end = aFileName.find('.')
+    mission_name = aFileName[start + 1:end]
     missionlist = processMission(aFileName, vehicle)
 
     print("\nUpload mission from a file: %s" % aFileName)
@@ -170,6 +188,7 @@ def updateVehicleStatus(vehicle):
     """
     Updates readout with vehicle information while vehicle is connected.
     """
+    global mission_name
     while connected:
     #update the readout with vehicle information
         updateText = ''
@@ -192,7 +211,7 @@ def updateVehicleStatus(vehicle):
         "\nThrottle Failsafe: "  + tfs +
         "\nBattery Failsafe:  " + bfs +
         "\nGCS Failsafe:      " + gcsfs +
-        "\nMission Read:      " + missionRead)
+        "\nMission Read:      " + mission_name)
 
         #update the readout
         updateReadoutWindow(updatePanes[0], updateText)
