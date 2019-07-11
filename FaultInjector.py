@@ -3,10 +3,11 @@ from dronekit_sitl import SITL
 # Import DroneKit-Python
 import os
 import signal
+import time
 import psutil
 from dronekit import connect, VehicleMode, Command
 from tkinter import *
-import time, _thread, sys, struct, os
+import time, _thread, sys, struct
 from curses import ascii
 from pymavlink import mavparm, mavutil
 from pymavlink.dialects.v10 import common as mavlink
@@ -35,89 +36,82 @@ mission_name = "None"
 #Button Activity
 gcsfs = bfs = tfs = rfs = gpsfs = "Inactive"
 missionRead = "False"
+previous_ip = False
+
+DEFAULT_PORT = '14551'
+DEFAULT_IP = '127.0.0.1'
+
+files = []
 
 """
-Code to kill all MavProxy scripts. Borrowed from:
-http://makble.com/kill-process-with-python-on-windows
+MISSIONS
+Load missions, start missions, and reset missions.
 """
-def kill_by_process_name(name):
+def getAllMissions():
     """
-    Goes through all processes and kills those with matching names
+    Gets all the missions in the 'missions' folder.
+    Code borrowed/modified from here:
+    https://www.mkyong.com/python/python-how-to-list-all-files-in-a-directory/
     """
-    for proc in psutil.process_iter():
-        if proc.name() == name:
-            print("Killing process: " + name)
-            if not 'SYSTEM' in proc.name():
-                proc.kill()
-                print("Killing process: " + name + " success")
-    return
+    global files
 
-    print("Not found process: " + name)
+    path = 'C:\\Users\\omara\\Documents\\delia\\FaultInjector\\missions\\'
 
-def check_process_exist_by_name(name):
+    files = []
+    # r=root, d=directories, f = files
+    for r, d, f in os.walk(path):
+        for file in f:
+            if '.txt' in file:
+                files.append(path + file)
+
+def runAllMissions():
     """
-    Checks to see if a process with a particular name exists
+    Runs all the missions in the 'missions' folder.
+    Called when 'Run All' button is pressed
     """
-    for proc in psutil.process_iter():
-        if proc.name() == name:
-            return True
+    global vehicle
+    global files
 
-    return False
+    # Get all the files in the mission and begins with first file
+    getAllMissions()
+    first_file = files.pop(0)
+    # startSITL
+    startSITL()
+    # connectToDrone
+    time.sleep(20)
+    connectToDrone(DEFAULT_IP, DEFAULT_PORT)
+    # wait until armable
+    while not vehicle.is_armable:
+        print(" Waiting for vehicle to initialise...")
+        time.sleep(1)
+    # pload mision to drone
+    uploadMission(first_file)
+    # start mission
+    startMission()
 
-def startSITL(lat=None, lon=None):
-    global sitl
-    os.chdir(r"C:\cygwin64\bin")
-    cmd = ["bash.exe", "-c", '. /etc/profile;  sim_vehicle.py --console --out 192.168.5.32:14550 -L MEX -v ArduPlane']
+def uploadMission(aFileName):
+    """
+    Upload a mission from a file.
+    """
+    #Read mission from file
+    global vehicle
+    global mission_name
+    start = aFileName.find('/')
+    end = aFileName.find('.')
+    mission_name = aFileName[start + 1:end]
+    missionlist = processMission(aFileName, vehicle)
 
-    sitl = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                       shell=True)
-
-def stopSITL():
-    for proc in psutil.process_iter():
-        print(proc.name())
-    kill_by_process_name('mavproxy.exe')
-
-#connects to a drone sitting at ip:port and dispatches a thread to display it's
-#information to the readout window
-def connectToDrone(dkip, dkport):
-  #Dronekit connection
-  global vehicle
-  global previous_ip
-  global previous_port
-  previous_ip = dkip
-  previous_port = dkport
-  #connect to vehicle at ip:port
-  print("Attempting To Connect to Dronekit")
-  vehicle = connect(dkip+':'+dkport, wait_ready=True)
-
-  #initialize globals associated with the vehicle
-  #Throttle PWM fail safe value
-  global THR_FS_VAL
-  THR_FS_VAL = vehicle.parameters['THR_FS_VALUE']
-  #Battery capacity failsafe value
-  global BATT_CRT_MAH
-  BATT_CRT_MAH = vehicle.parameters['BATT_CRT_MAH']
-  #ID of the ground control station
-  global SYSID_MYGCS
-  SYSID_MYGCS = vehicle.parameters['SYSID_MYGCS']
-  global HOME_LOC
-  HOME_LOC = vehicle.location.global_frame
-
-  #set connected bool to True
-  global connected
-  connected = True
-
-  # create thread to update readout information in real time
-  _thread.start_new_thread(updateVehicleStatus, (vehicle,))
-
-
-#disconnects the vehicle and cleans the readout
-def disconnect():
-  #close vehicle connection
-  vehicle.close()
-  updateReadoutWindow(updatePanes[0], "Disconnected")
-  global connected
-  connected = False
+    print("\nUpload mission from a file: %s" % aFileName)
+    #Clear existing mission from vehicle
+    print('Clearing mission')
+    cmds = vehicle.commands
+    cmds.clear()
+    #Add new mission to vehicle
+    for command in missionlist:
+        cmds.add(command)
+    print('Uploading mission...')
+    vehicle.commands.upload()
+    print('Mission uploaded.')
 
 def startMission():
     """
@@ -149,76 +143,172 @@ def resetMission():
     Returns vehicle to its home position
     Sets the velocity to 0, disarms, and sets mode back to manual
     Should probably also reset battery
+    Does not load the same mission
     """
     global vehicle
     global previous_ip
     global previous_port
+
+    if not previous_ip:
+        previous_ip = DEFAULT_IP
+        previous_port = DEFAULT_PORT
     print("Resetting Position...")
     disconnect()
     stopSITL()
     startSITL()
     connectToDrone(previous_ip, previous_port)
 
-
-def uploadMission(aFileName):
+"""
+MAVPROXY
+Code to kill all MavProxy scripts. Borrowed from:
+http://makble.com/kill-process-with-python-on-windows
+"""
+def kill_by_process_name(name):
     """
-    Upload a mission from a file.
+    Goes through all processes and kills those with matching names
     """
-    #Read mission from file
-    global vehicle
-    global mission_name
-    start = aFileName.find('/')
-    end = aFileName.find('.')
-    mission_name = aFileName[start + 1:end]
-    missionlist = processMission(aFileName, vehicle)
+    for proc in psutil.process_iter():
+        if proc.name() == name:
+            print("Killing process: " + name)
+            if not 'SYSTEM' in proc.name():
+                proc.kill()
+                print("Killing process: " + name + " success")
+    return
 
-    print("\nUpload mission from a file: %s" % aFileName)
-    #Clear existing mission from vehicle
-    print('Clearing mission')
-    cmds = vehicle.commands
-    cmds.clear()
-    #Add new mission to vehicle
-    for command in missionlist:
-        cmds.add(command)
-    print('Uploading mission...')
-    vehicle.commands.upload()
-    print('Mission uploaded.')
+    print("Not found process: " + name)
+
+def check_process_exist_by_name(name):
+    """
+    Checks to see if a process with a particular name exists
+    """
+    for proc in psutil.process_iter():
+        if proc.name() == name:
+            return True
+
+    return False
+
+def startSITL(loc='MEX'):
+    global sitl
+    os.chdir(r"C:\cygwin64\bin")
+    cmd_text = '. /etc/profile;  '
+    cmd_text += 'sim_vehicle.py --console --out 192.168.5.32:14550 -L '
+    cmd_text += loc
+    cmd_text += ' -v ArduPlane'
+    cmd = ["bash.exe", "-c", cmd_text]
+
+    sitl = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                       shell=True)
+
+def stopSITL():
+    kill_by_process_name('mavproxy.exe')
+
+"""
+CONNECTION AND MISSIONS
+Code that connects/disconnects from drones via UDP.
+"""
+def connectToDrone(dkip, dkport):
+  #Dronekit connection
+  global vehicle
+  global previous_ip
+  global previous_port
+  previous_ip = dkip
+  previous_port = dkport
+  #connect to vehicle at ip:port
+  print("Attempting To Connect to Dronekit")
+  vehicle = connect(dkip+':'+dkport, wait_ready=True)
+
+  #initialize globals associated with the vehicle
+  #Throttle PWM fail safe value
+  global THR_FS_VAL
+  THR_FS_VAL = vehicle.parameters['THR_FS_VALUE']
+  #Battery capacity failsafe value
+  global BATT_CRT_MAH
+  BATT_CRT_MAH = vehicle.parameters['BATT_CRT_MAH']
+  #ID of the ground control station
+  global SYSID_MYGCS
+  SYSID_MYGCS = vehicle.parameters['SYSID_MYGCS']
+  global HOME_LOC
+  HOME_LOC = vehicle.location.global_frame
+
+  #set connected bool to True
+  global connected
+  connected = True
+
+  # create thread to update readout information in real time
+  _thread.start_new_thread(updateVehicleStatus, (vehicle,))
+
+#disconnects the vehicle and cleans the readout
+def disconnect():
+  #close vehicle connection
+  vehicle.close()
+  updateReadoutWindow(updatePanes[0], "Disconnected")
+  global connected
+  connected = False
+
+
+"""
+UI
+Update the readout and create buttons
+"""
 
 def updateVehicleStatus(vehicle):
     """
     Updates readout with vehicle information while vehicle is connected.
     """
     global mission_name
+    global files
     while connected:
-    #update the readout with vehicle information
-        updateText = ''
-        updateText += ("System Status: %s" % vehicle.system_status.state +
-        "\nLast Heartbeat: %s" %vehicle.last_heartbeat +
-              "\nMode: %s" % vehicle.mode.name +
-              "\nIs Armable?: %s" % vehicle.is_armable + "\n")
-        #Add battery/location/environment info
-        updateText += ("\nBattery Capacity: %s MAH" % vehicle.parameters['BATT_CAPACITY'] +
-               "\nGPS Info: %s" % vehicle.gps_0 +
-        "\nLatitude: %s " % vehicle.location.global_relative_frame.lat +
-        "\nLongitude: %s" % vehicle.location.global_relative_frame.lon +
-           "\nAirspeed: %s" % vehicle.velocity +
-           "\nAltitude: %s" % vehicle.location.global_relative_frame.alt +
-        "\nWind Speed: %s" % vehicle.parameters['SIM_WIND_SPD'] +
-        "\nWind Direction: %s\n" % vehicle.parameters['SIM_WIND_DIR'])
-        #add failsafes
-        updateText += ("\nGPS Failsafe:      " + gpsfs +
-        "\nRadio Failsafe:    " + rfs +
-        "\nThrottle Failsafe: "  + tfs +
-        "\nBattery Failsafe:  " + bfs +
-        "\nGCS Failsafe:      " + gcsfs +
-        "\nMission Read:      " + mission_name)
+        if vehicle.mode.name == 'RTL':
+            # Disconnect
+            disconnect()
+            # Stop the simulation
+            stopSITL()
+            if len(files) > 0:
+                next_file = files.pop(0)
+                stopSITL()
+                startSITL()
+                # connectToDrone
+                time.sleep(20)
+                connectToDrone(DEFAULT_IP, DEFAULT_PORT)
+                # wait until armable
+                while not vehicle.is_armable:
+                    print(" Waiting for vehicle to initialise...")
+                    time.sleep(1)
+                # uploadMission(fileName)
+                uploadMission(next_file)
+                # startMission
+                startMission()
+        else:
+            #update the readout with vehicle information
+            updateText = ''
+            updateText += ("System Status: %s" % vehicle.system_status.state +
+            "\nLast Heartbeat: %s" %vehicle.last_heartbeat +
+                  "\nMode: %s" % vehicle.mode.name +
+                  "\nIs Armable?: %s" % vehicle.is_armable + "\n")
+            #Add battery/location/environment info
+            updateText += ("\nBattery Capacity: %s MAH" % vehicle.parameters['BATT_CAPACITY'] +
+                   "\nGPS Info: %s" % vehicle.gps_0 +
+            "\nLatitude: %s " % vehicle.location.global_relative_frame.lat +
+            "\nLongitude: %s" % vehicle.location.global_relative_frame.lon +
+               "\nAirspeed: %s" % vehicle.velocity +
+               "\nAltitude: %s" % vehicle.location.global_relative_frame.alt +
+            "\nWind Speed: %s" % vehicle.parameters['SIM_WIND_SPD'] +
+            "\nWind Direction: %s\n" % vehicle.parameters['SIM_WIND_DIR'])
+            #add failsafes
+            updateText += ("\nGPS Failsafe:      " + gpsfs +
+            "\nRadio Failsafe:    " + rfs +
+            "\nThrottle Failsafe: "  + tfs +
+            "\nBattery Failsafe:  " + bfs +
+            "\nGCS Failsafe:      " + gcsfs +
+            "\nMission Read:      " + mission_name)
 
-        #update the readout
-        updateReadoutWindow(updatePanes[0], updateText)
-        #update root
-        root.update()
-        #wait for 1 second
-        time.sleep(1)
+            #update the readout
+            updateReadoutWindow(updatePanes[0], updateText)
+            #update root
+            root.update()
+            # begins the disconnect
+            #wait for 1 second
+            time.sleep(1)
 
 #helper function to write information to the readout
 def updateReadoutWindow(textWindow, text):
@@ -248,15 +338,22 @@ def loadToolbar(root):
     # mpToolBar
     ###
 
-    SITLStartcon = Button(mpToolbar, text="Start SITL", width=6, command=lambda: startSITL())
+    SITLStartcon = Button(mpToolbar, text="Start SITL", width=6, command=lambda: startSITL(SITLLoc.get()))
     SITLStartcon.pack(side=LEFT, padx=2, pady=2)
     SITLStopcon = Button(mpToolbar, text="Stop SITL", width=6, command=lambda: stopSITL())
     SITLStopcon.pack(side=LEFT, padx=2, pady=2)
 
-    mpLabel = Label(mpToolbar, text = "Connect to Drone: ")
+    SITLLabel = Label(mpToolbar, text = "Loc: ")
+    SITLLabel.pack(side=LEFT, padx=2, pady=2)
+    SITLLoc = Entry(mpToolbar)
+    SITLLoc.delete(0, END)
+    SITLLoc.insert(0, "MEX")
+    SITLLoc.pack(side=LEFT, padx=2, pady=2)
+
+    mpLabel = Label(mpToolbar, text = "Connect: ")
     mpLabel.pack(side=LEFT, padx=2, pady=2)
     #creates IP label
-    MPipLabel = Label(mpToolbar, text="IP Address")
+    MPipLabel = Label(mpToolbar, text="IP")
     MPipLabel.pack(side=LEFT, padx=2, pady=2)
 
     #creates IP entry box
@@ -298,6 +395,8 @@ def loadToolbar(root):
     fileLoad.pack(side=LEFT, padx=2, pady=2)
     resetButton = Button(fileToolbar, text="Reset", width=6, command=lambda: resetMission())
     resetButton.pack(side=LEFT, padx=2, pady=2)
+    runMany = Button(fileToolbar, text="Run All", width=6, command=lambda: runAllMissions())
+    runMany.pack(side=LEFT, padx=2, pady=2)
 
 
     ###
@@ -336,9 +435,12 @@ def loadInfoPane(root):
   #returns panes
   return [readout, buttonArray, bottomLeft]
 
-'''The following 6 functions are called when their corresponding Fault Buttons are pressed.
-   Each one communicates with SITL and Dronekit to read and set variables inside the vehicle
-   and simulation'''
+"""
+FAULT INJECTION
+The following 6 functions are called when their corresponding Fault Buttons are pressed.
+Each one communicates with SITL and Dronekit to read and set variables inside the vehicle
+and simulation
+"""
 def wind(windSPD, windDIR):
   #create mavproxy parameter dictionary
   mav_param = mavparm.MAVParmDict()
@@ -522,7 +624,7 @@ def main():
   #add window title
   root.title("Fault Injector")
   #set window size
-  root.geometry("760x420")
+  root.geometry("800x420")
   #add the connections toolbar onto the root window
   loadToolbar(root)
   global updatePanes
