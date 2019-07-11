@@ -38,7 +38,13 @@ locations as its default and would recommend cloning [my fork](https://github.co
 ### SITL
 To start a new instance of MavLink's SITL, simply press 'Start SITL' in the
 upper left toolbar. This will run `sim_vehicle.py` with the default options in Mexico.
-To change the location, either edit the `FaultInjector.py` script itself
+To change the location, enter your preferred location into the text box.
+
+If you would like to add a named location to ArduPilot, simply navigate to
+`your_ardupilot_folder/Tools/autotest` and modify the `locations.txt` file
+in the specified manner. Restart FaultInjector to be able to enter that location
+in the box.
+
 ### Missions
 To load custom missions in FaultInjector
 
