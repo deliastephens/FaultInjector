@@ -16,11 +16,21 @@ environments, making it a robust UAV testing and verification tool.
 
 ### Running
 To run FaultInjector, simply download all of the required programs and packages,
-navigate to the folder that contains `FaultInjector.py` in a Command Prompt, and
+you'll need to do some setup on your own machine.
+
+First, change the `path` variable in the `FaultInjector.py` script to the location
+of your missions folder. This ensures that Python will be able to find where you
+put all your missions.  
+
+To load more custom missions, simply add the waypoint file to your mission folder.
+
+Then, navigate to the folder that contains `FaultInjector.py` in a Command Prompt, and
 type
 ```
 python3 FaultInjector.py
 ```
+
+
 
 ## Requirements
 ### Python and Packages
@@ -60,10 +70,44 @@ in the box.
 This version of FaultInjector allows for custom missions to be loaded.
 
 To load custom missions in FaultInjector, there are two options:
-put your Mission File (saved as MP Waypoint.txt) in the following format (insert picture)
+put your Mission File (saved as a text file) in the following format
 into the `missions` folder.
+![](https://raw.githubusercontent.com/deliastephens/mission-converter/master/wp_format.PNG)
 
 FaultInjector will automatically recenter the mission around the home point of
-the drone itself.
+the drone itself using the [mission-converter](https://github.com/deliastephens/mission-converter) script I wrote for this program.
+
+This script is currently only tested with a few types of entries; if there are issues,
+please let me know.
+
+To load one mission, simply press the 'Load' button when FaultInjector is connected
+to a MAVLink instance. Once the waypoints have been converted, press 'Start'.
+
+To run all the missions in the missions folder, press 'Run All'. This will sequentially
+start and stop SITL instances, load missions, and run them. The termination condition
+is reaching the final waypoint.
 
 ### FaultInjection
+Image here.
+
+With the [original FaultInjector code](https://github.com/boubinjg/FaultInjector),
+you can:
+
+* Add wind and change its direction
+* Simulate failures of GPS and RC
+* Activate failsafes for throttle and battery
+* Simulate a disconnected ground control system
+
+This is useful for testing because it becomes much easier to determine the fault
+tolerance of your autopilot. By running multiple missions in succession with
+various failures, it is easy to test how well your autopilot will respond to
+con-ideal conditions. Previously, simulations were done in mostly ideal environments;
+by enhancing the functionality of the original FaultInjector, we have developed
+a robust SITL testing environment.
+
+### Additional Connections
+Adding connections works the same way it does with running the sim_vehicle.py script:
+you can connect via TCP or UDP using your favorite ground control software and
+flight simulation visualizations.
+
+For more information, check out my in-depth guide over [here](https://gist.github.com/deliastephens/6eb3fb3111f5d854bb240c7649847c1f).
