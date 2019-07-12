@@ -49,7 +49,8 @@ locations as its default and would recommend cloning [my fork](https://github.co
 ## Features
 ### SITL
 ![](https://raw.githubusercontent.com/deliastephens/FaultInjector/master/res/connect_toolbar.PNG)
-This version of FaultInjector inclues the ability to start and stop
+
+This version of FaultInjector includes the ability to start and stop
 Software-in-the-Loop Simulations (SITL).
 
 To start a new instance of MavLink's SITL, simply press 'Start SITL' in the
@@ -67,6 +68,7 @@ in the box.
 
 ### Missions
 ![](https://raw.githubusercontent.com/deliastephens/FaultInjector/master/res/mission_toolbar.PNG)
+
 This version of FaultInjector allows for custom missions to be loaded.
 
 To load custom missions in FaultInjector, there are two options:
