@@ -41,7 +41,11 @@ previous_ip = False
 DEFAULT_PORT = '14551'
 DEFAULT_IP = '127.0.0.1'
 
+# Loading Missions
 files = []
+path = 'C:\\Users\\omara\\Documents\\delia\\FaultInjector\\missions\\' # Change to your missions folder location
+runAll = False # If you awnt to run multiple scripts
+commands_uploaded = False
 
 """
 MISSIONS
@@ -54,8 +58,7 @@ def getAllMissions():
     https://www.mkyong.com/python/python-how-to-list-all-files-in-a-directory/
     """
     global files
-
-    path = 'C:\\Users\\omara\\Documents\\delia\\FaultInjector\\missions\\'
+    global path
 
     files = []
     # r=root, d=directories, f = files
@@ -71,6 +74,9 @@ def runAllMissions():
     """
     global vehicle
     global files
+    global runAll
+
+    runAll = True
 
     # Get all the files in the mission and begins with first file
     getAllMissions()
@@ -96,7 +102,10 @@ def uploadMission(aFileName):
     #Read mission from file
     global vehicle
     global mission_name
-    start = aFileName.find('/')
+    global commands_uploaded
+
+    # Get a clean version of the mission name
+    start = aFileName.rfind('\\')
     end = aFileName.find('.')
     mission_name = aFileName[start + 1:end]
     missionlist = processMission(aFileName, vehicle)
@@ -111,6 +120,7 @@ def uploadMission(aFileName):
         cmds.add(command)
     print('Uploading mission...')
     vehicle.commands.upload()
+    commands_uploaded = True
     print('Mission uploaded.')
 
 def startMission():
@@ -245,7 +255,6 @@ def disconnect():
   global connected
   connected = False
 
-
 """
 UI
 Update the readout and create buttons
@@ -257,12 +266,19 @@ def updateVehicleStatus(vehicle):
     """
     global mission_name
     global files
+    global runAll
+    global commands_uploaded
+
     while connected:
-        if vehicle.mode.name == 'RTL':
+        # If running all scripts and you reach the final waypoint,
+        # go to the next script
+        if commands_uploaded and vehicle.commands.next == len(vehicle.commands) and runAll:
             # Disconnect
             disconnect()
             # Stop the simulation
             stopSITL()
+            commands_uploaded = False
+            # If there are still files left to search
             if len(files) > 0:
                 next_file = files.pop(0)
                 stopSITL()
@@ -328,6 +344,7 @@ def loadToolbar(root):
     any of the variables.
     Includes: IP/Port connection, Mission Parser and Loader
     """
+    global path
     #Creates toolbar frame
     toolbar = Frame(root);
     mpToolbar = Frame(toolbar);
@@ -389,7 +406,7 @@ def loadToolbar(root):
     fileBox.delete(0, END)
     fileBox.insert(0, "mission_basic.txt")
     fileBox.pack(side=LEFT, padx=2, pady=2)
-    fileLoad = Button(fileToolbar, text="Load", width=6, command=lambda: uploadMission('missions/' + fileBox.get()))
+    fileLoad = Button(fileToolbar, text="Load", width=6, command=lambda: uploadMission(path + fileBox.get()))
     fileLoad.pack(side=LEFT, padx=2, pady=2)
     fileLoad = Button(fileToolbar, text="Start", width=6, command=lambda: startMission())
     fileLoad.pack(side=LEFT, padx=2, pady=2)
