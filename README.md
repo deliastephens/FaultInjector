@@ -88,7 +88,7 @@ start and stop SITL instances, load missions, and run them. The termination cond
 is reaching the final waypoint.
 
 ### FaultInjection
-Image here.
+![](https://raw.githubusercontent.com/deliastephens/FaultInjector/master/res/faults.PNG)
 
 With the [original FaultInjector code](https://github.com/boubinjg/FaultInjector),
 you can:
